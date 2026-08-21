@@ -8,8 +8,8 @@ describe("Test Staking Contract", function (){
     let staker2;
     let staking;
     let stakingToken;
-    const REWARDS_POOL = 20_000;
-    const MIN_AMOUNT = 10;
+    const REWARDS_POOL = ethers.parseUnits("20000", 18);
+    const MIN_AMOUNT = ethers.parseUnits("10", 18);
 
     beforeEach(async function() {
         [owner, devWallet, staker1, staker2] = await ethers.getSigners();
@@ -71,11 +71,96 @@ describe("Test Staking Contract", function (){
     });
 
     describe("Staking", function(){
+        it("Should allow users to stake", async function(){
+            const mintAmount = ethers.parseUnits("5000", 18);
+            const stakeAmount = ethers.parseUnits("20", 18);
 
+            await mintTokens(staker1, 5000);
+            await stakingToken.connect(staker1).approve(await staking.getAddress(), stakeAmount);
+            await staking.connect(staker1).stake(stakeAmount);
+
+            expect(await staking.totalStaked()).to.equal(stakeAmount);
+            expect(await stakingToken.balanceOf(staker1.address)).to.be.lessThan(mintAmount);
+        });
+
+        it("Should update userStake and mapping upon staking", async function(){
+            const stakeAmount = ethers.parseUnits("20", 18);
+
+            await mintTokens(staker1, 5000);
+            await stakingToken.connect(staker1).approve(await staking.getAddress(), stakeAmount);
+            await staking.connect(staker1).stake(stakeAmount)
+
+            const stake = await staking.userStakes(staker1.address, 0);
+
+            expect(stake.stakedAmount).to.equal(stakeAmount);
+            expect(stake.active).to.be.true;
+        });
+
+        it("Should emit the correct event", async function(){
+            const stakeAmount = ethers.parseUnits("20", 18);
+
+            await mintTokens(staker1, 5000);
+            await stakingToken.connect(staker1).approve(await staking.getAddress(), stakeAmount);
+
+            await expect(staking.connect(staker1).stake(stakeAmount)).to.emit(staking, "Stake");
+        });
+
+        it("Should allow user have multiple stakes", async function(){
+            const stakeAmount = ethers.parseUnits("20", 18);
+
+            await mintTokens(staker1, 5000);
+            await stakingToken.connect(staker1).approve(await staking.getAddress(), ethers.parseUnits("80", 18));
+            await staking.connect(staker1).stake(stakeAmount);
+            await staking.connect(staker1).stake(stakeAmount);
+            await staking.connect(staker1).stake(stakeAmount);
+            await staking.connect(staker1).stake(stakeAmount);
+
+            const stakes = await staking.getUserStakes(staker1.address);
+            expect(stakes.length).to.equal(4);
+        });
+
+        it("Should revert when the user stakes amount less than minimum amount", async function(){
+            const stakeAmount = ethers.parseUnits("5", 18);
+
+            await mintTokens(staker1, 5000);
+             await stakingToken.connect(staker1).approve(await staking.getAddress(), stakeAmount);
+            await expect(staking.connect(staker1).stake(stakeAmount)).to.be.revertedWith("Amount less than minimum amount");
+        });
     });
 
     describe("Claim rewards", function(){
+        const stakeAmount = ethers.parseUnits("20", 18);
 
+        beforeEach(async function(){
+            await mintTokens(staker1, ethers.parseUnits("5000", 18));
+            await stakingToken.connect(staker1).approve(await staking.getAddress(), stakeAmount);
+            await staking.connect(staker1).stake(stakeAmount);
+        });
+
+        it("Should accrue rewards after time passes", async function(){
+            const balanceBefore = await stakingToken.balanceOf(staker1.address);
+            await increaseTime(600);
+            await staking.connect(staker1).claimRewards(0);
+            const balanceAfter = await stakingToken.balanceOf(staker1.address);
+            expect(balanceAfter).to.be.greaterThan(balanceBefore);
+        });
+
+        it("Should update lastClaimed after claiming", async function(){
+            await increaseTime(600);
+            await staking.connect(staker1).claimRewards(0);
+            const stake = await staking.userStakes(staker1.address, 0);
+            expect(stake.lastClaimed).to.be.greaterThan(0);
+        });
+
+        it("Should revert if stake index does not exist", async function(){
+            await expect(staking.connect(staker1).claimRewards(99)).to.be.revertedWith("Stake does not exist");
+        });
+
+        it("Should revert if stake is not active", async function(){
+            await increaseTime(600);
+            await staking.connect(staker1).unstake(0);
+            await expect(staking.connect(staker1).claimRewards(0)).to.be.revertedWith("No active stake");
+        });
     });
 
     describe("Unstake", function(){

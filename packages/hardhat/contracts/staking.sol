@@ -137,6 +137,10 @@ contract Staking is Initializable, UUPSUpgradeable, OwnableUpgradeable, Reentran
         return (s.stakedAmount * tier.dailyRate * duration) / (denominator * period);
     }
 
+    function getUserStakes(address _user) external view returns(stakeInfo[] memory){
+        return userStakes[_user];
+    }
+
     //admit functions
     function resetTier(uint256 _lockDuration, uint256 _percentageRate) external onlyOwner{
         tier = Tier(_lockDuration, _percentageRate);
