@@ -43,6 +43,7 @@ contract Staking is Initializable, UUPSUpgradeable, OwnableUpgradeable, Reentran
     event ClaimedRewards(address indexed user, uint256 indexed stakeIndex, uint256 amount);
     event Unstake(address indexed user, uint256 indexed stakeIndex, uint256 amount);
     event WithdrawalTax(address indexed devWallet, uint256 indexed stakeIndex, uint256 amount);
+    event FundRewardPool(address owner, uint256 amount);
     
 
     //disbale initializer
@@ -53,6 +54,8 @@ contract Staking is Initializable, UUPSUpgradeable, OwnableUpgradeable, Reentran
 
     //initializer
     function initialize(address _stakingToken, address _devWallet, uint256 _minAmount) public initializer{
+        __Ownable_init();
+        __UUPSUpgradeable_init();
         stakingToken = IERC20(_stakingToken);
         devWallet = _devWallet;
         minAmount = _minAmount;
@@ -143,7 +146,11 @@ contract Staking is Initializable, UUPSUpgradeable, OwnableUpgradeable, Reentran
         minAmount = _minAmount;
     }
 
-    function fundRewardPool(uint256 _amount) external onlyOwner{}
+    function fundRewardPool(uint256 _amount) external onlyOwner{
+        stakingToken.transferFrom(msg.sender, address(this), _amount);
+        rewardPool += _amount;
+        emit FundRewardPool(msg.sender, _amount);
+    }
 
     function resetPeriod(uint256 _period) external onlyOwner {
         period = _period;

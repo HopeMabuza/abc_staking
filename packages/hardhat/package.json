@@ -21,9 +21,9 @@
     "@nomicfoundation/hardhat-toolbox": "^6.1.2",
     "@nomiclabs/hardhat-ethers": "^2.0.3",
     "@nomiclabs/hardhat-etherscan": "^2.1.8",
-    "@openzeppelin/hardhat-upgrades": "^1.12.0",
+    "@openzeppelin/hardhat-upgrades": "^3.9.1",
     "dotenv": "^17.4.2",
-    "ethers": "^5.5.2",
+    "ethers": "^6.17.0",
     "hardhat": "^2.8.0"
   },
   "dependencies": {
