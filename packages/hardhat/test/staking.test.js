@@ -164,19 +164,130 @@ describe("Test Staking Contract", function (){
     });
 
     describe("Unstake", function(){
+        const stakeAmount = ethers.parseUnits("20", 18);
 
+        it("Should revert if lock period has not ended", async function(){
+            await mintTokens(staker1, ethers.parseUnits("5000", 18));
+            await stakingToken.connect(staker1).approve(await staking.getAddress(), stakeAmount);
+            await staking.connect(staker1).stake(stakeAmount);
+
+            await expect(staking.connect(staker1).unstake(0)).to.be.revertedWith("Lock period not over");
+        });
+
+        it("Should allow unstake after lock period and return tokens minus tax to staker", async function(){
+            await mintTokens(staker1, ethers.parseUnits("5000", 18));
+            await stakingToken.connect(staker1).approve(await staking.getAddress(), stakeAmount);
+            await staking.connect(staker1).stake(stakeAmount);
+
+            const balanceBefore = await stakingToken.balanceOf(staker1.address);
+            await increaseTime(600);
+            await staking.connect(staker1).unstake(0);
+            const balanceAfter = await stakingToken.balanceOf(staker1.address);
+
+            const tax = (stakeAmount * 200n) / 10000n;
+            expect(balanceAfter).to.equal(balanceBefore + stakeAmount - tax);
+        });
+
+        it("Should send tax to devWallet on unstake", async function(){
+            await mintTokens(staker1, ethers.parseUnits("5000", 18));
+            await stakingToken.connect(staker1).approve(await staking.getAddress(), stakeAmount);
+            await staking.connect(staker1).stake(stakeAmount);
+
+            const devBalanceBefore = await stakingToken.balanceOf(devWallet.address);
+            await increaseTime(600);
+            await staking.connect(staker1).unstake(0);
+            const devBalanceAfter = await stakingToken.balanceOf(devWallet.address);
+
+            const tax = (stakeAmount * 200n) / 10000n;
+            expect(devBalanceAfter).to.equal(devBalanceBefore + tax);
+        });
+
+        it("Should mark stake as inactive after unstaking", async function(){
+            await mintTokens(staker1, ethers.parseUnits("5000", 18));
+            await stakingToken.connect(staker1).approve(await staking.getAddress(), stakeAmount);
+            await staking.connect(staker1).stake(stakeAmount);
+
+            await increaseTime(600);
+            await staking.connect(staker1).unstake(0);
+            const stake = await staking.userStakes(staker1.address, 0);
+            expect(stake.active).to.be.false;
+        });
+
+        it("Should revert if stake index does not exist", async function(){
+            await expect(staking.connect(staker1).unstake(99)).to.be.revertedWith("Stake does not exist");
+        });
+
+        it("Should revert if stake is already inactive", async function(){
+            await mintTokens(staker1, ethers.parseUnits("5000", 18));
+            await stakingToken.connect(staker1).approve(await staking.getAddress(), stakeAmount);
+            await staking.connect(staker1).stake(stakeAmount);
+
+            await increaseTime(600);
+            await staking.connect(staker1).unstake(0);
+            await expect(staking.connect(staker1).unstake(0)).to.be.revertedWith("No active stake");
+        });
     });
 
     describe("Helpers", function(){
+        const stakeAmount = ethers.parseUnits("20", 18);
 
+        it("Should return 0 if no time has passed", async function(){
+            await mintTokens(staker1, ethers.parseUnits("5000", 18));
+            await stakingToken.connect(staker1).approve(await staking.getAddress(), stakeAmount);
+            await staking.connect(staker1).stake(stakeAmount);
+
+            const rewards = await staking.calculateRewards(staker1.address, 0);
+            expect(rewards).to.equal(0);
+        });
+
+        it("Should return correct reward amount after time passes", async function(){
+            await mintTokens(staker1, ethers.parseUnits("5000", 18));
+            await stakingToken.connect(staker1).approve(await staking.getAddress(), stakeAmount);
+            await staking.connect(staker1).stake(stakeAmount);
+
+            await increaseTime(600);
+            const rewards = await staking.calculateRewards(staker1.address, 0);
+            expect(rewards).to.be.greaterThan(0);
+        });
     });
 
     describe("Admin function", function(){
+        it("Should allow owner to reset tier", async function(){
+            await staking.resetTier(1200, 5000);
+            const tier = await staking.tier();
+            expect(tier.lockDuration).to.equal(1200n);
+            expect(tier.dailyRate).to.equal(5000n);
+        });
 
+        it("Should allow owner to set min amount", async function(){
+            const newMin = ethers.parseUnits("50", 18);
+            await staking.setMinAmount(newMin);
+            expect(await staking.minAmount()).to.equal(newMin);
+        });
+
+        it("Should revert if non-owner calls resetTier", async function(){
+            await expect(staking.connect(staker1).resetTier(1200, 5000)).to.be.reverted;
+        });
+
+        it("Should revert if non-owner calls setMinAmount", async function(){
+            await expect(staking.connect(staker1).setMinAmount(ethers.parseUnits("50", 18))).to.be.reverted;
+        });
     });
 
     describe("Upgradeability (UUPS)", function(){
+        it("Should allow owner to upgrade the contract", async function(){
+            const StakingV2 = await ethers.getContractFactory("Staking");
+            await expect(upgrades.upgradeProxy(await staking.getAddress(), StakingV2, {
+                kind: "uups", unsafeAllow: ["constructor"]
+            })).to.not.be.reverted;
+        });
 
+        it("Should revert if non-owner tries to upgrade", async function(){
+            const StakingV2 = await ethers.getContractFactory("Staking", staker1);
+            await expect(upgrades.upgradeProxy(await staking.getAddress(), StakingV2, {
+                kind: "uups", unsafeAllow: ["constructor"]
+            })).to.be.reverted;
+        });
     });
 
 })
