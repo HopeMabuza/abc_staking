@@ -5,10 +5,10 @@ pragma solidity ^0.8.18;
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-contract Staking is Initializable, UUPSUpgradeable, OwnableUpgradeable, ReentrancyGuard {
+contract Staking is Initializable, UUPSUpgradeable, OwnableUpgradeable, ReentrancyGuardUpgradeable {
     //state variables
     IERC20 public stakingToken;
 
@@ -37,6 +37,8 @@ contract Staking is Initializable, UUPSUpgradeable, OwnableUpgradeable, Reentran
     uint256 public totalTaxed;
     uint256 public totalStaked;
     uint256 public rewardPool;
+    uint256 public totalStakers;
+    //add total active stakers to keep track of active stakers not just people who have staked to the contract?
 
     //events
     event Stake(address indexed user, uint256 indexed stakeIndex, uint256 amount);
@@ -44,6 +46,7 @@ contract Staking is Initializable, UUPSUpgradeable, OwnableUpgradeable, Reentran
     event Unstake(address indexed user, uint256 indexed stakeIndex, uint256 amount);
     event WithdrawalTax(address indexed devWallet, uint256 indexed stakeIndex, uint256 amount);
     event FundRewardPool(address owner, uint256 amount);
+    event WithdrewStuckTokens(address owner, uint256 amount);
     
 
     //disbale initializer
@@ -56,11 +59,12 @@ contract Staking is Initializable, UUPSUpgradeable, OwnableUpgradeable, Reentran
     function initialize(address _stakingToken, address _devWallet, uint256 _minAmount) public initializer{
         __Ownable_init();
         __UUPSUpgradeable_init();
+        __ReentrancyGuard_init();
         stakingToken = IERC20(_stakingToken);
         devWallet = _devWallet;
         minAmount = _minAmount;
         period = 60; // 1 minute
-        taxRate = 200; // 2%
+        taxRate = 1000; // 10% as per scope
         denominator = 10000; 
         tier = Tier(600, 3000); //10 miutes, 30%
 
@@ -82,6 +86,7 @@ contract Staking is Initializable, UUPSUpgradeable, OwnableUpgradeable, Reentran
 
 
         uint256 stakeIndex = userStakes[msg.sender].length - 1;
+        if (stakeIndex == 0) totalStakers++;
         totalStaked += _amount;
 
         emit Stake(msg.sender, stakeIndex, _amount);
@@ -119,6 +124,8 @@ contract Staking is Initializable, UUPSUpgradeable, OwnableUpgradeable, Reentran
         stakingToken.transfer(msg.sender, s.stakedAmount - tax);
         s.active = false;
         totalStaked -= s.stakedAmount;
+
+        //deduct the total staked users
 
         emit Unstake(msg.sender, _stakeIndex, s.stakedAmount - tax);
     }
@@ -158,6 +165,11 @@ contract Staking is Initializable, UUPSUpgradeable, OwnableUpgradeable, Reentran
 
     function resetPeriod(uint256 _period) external onlyOwner {
         period = _period;
+    }
+
+    function withdrawStuckTokens(uint256 _amount) external onlyOwner{
+        stakingToken.transfer(msg.sender, _amount);
+        emit WithdrewStuckTokens(msg.sender, _amount);
     }
 
     //authorize upgradeable

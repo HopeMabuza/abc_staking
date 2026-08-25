@@ -18,7 +18,7 @@ module.exports = {
     // },
     ethSepolia: {
       url: process.env.ETH_SEPOLIA_RPC_URL || "https://rpc.sepolia.org",
-      accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
+      accounts: [process.env.PRIVATE_KEY, process.env.USER_PRIVATE_KEY].filter(Boolean),
       chainId: 11155111,
     },
     // bnb: {
@@ -66,24 +66,25 @@ module.exports = {
     },
   },
   etherscan: {
-    apiKey: {
-      // bnb: process.env.ARBISCAN_API_KEY,
-      // base: process.env.ARBISCAN_API_KEY,
-      // avax: process.env.ARBISCAN_API_KEY,
-      // eth: process.env.ARBISCAN_API_KEY,
-      // polygon: process.env.ARBISCAN_API_KEY,
-      ethSepolia: process.env.ETHERSCAN_API_KEY
-      // arbitrumSepolia: process.env.ARBISCAN_API_KEY,
-      // arb: process.env.ARBISCAN_API_KEY,
-      // arbitrumOne: process.env.ARBISCAN_API_KEY,
-      // arbMainnet: process.env.ARBISCAN_API_KEY,
-    },
+    apiKey: process.env.ETHERSCAN_API_KEY,
+    // apiKey: {
+    //   bnb: process.env.ARBISCAN_API_KEY,
+    //   base: process.env.ARBISCAN_API_KEY,
+    //   avax: process.env.ARBISCAN_API_KEY,
+    //   eth: process.env.ARBISCAN_API_KEY,
+    //   polygon: process.env.ARBISCAN_API_KEY,
+    //   ethSepolia: process.env.ETHERSCAN_API_KEY,
+    //   arbitrumSepolia: process.env.ARBISCAN_API_KEY,
+    //   arb: process.env.ARBISCAN_API_KEY,
+    //   arbitrumOne: process.env.ARBISCAN_API_KEY,
+    //   arbMainnet: process.env.ARBISCAN_API_KEY,
+    // },
     customChains: [
       {
         network: "ethSepolia",
         chainId: 11155111,
         urls: {
-          apiURL: "https://api-sepolia.etherscan.io/api",
+          apiURL: "https://api.etherscan.io/v2/api?chainid=11155111",
           browserURL: "https://sepolia.etherscan.io/",
         },
       },
