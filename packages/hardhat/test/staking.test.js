@@ -295,6 +295,18 @@ describe("Test Staking Contract", function (){
         it("Should revert if non-owner calls setMinAmount", async function(){
             await expect(staking.connect(staker1).setMinAmount(ethers.parseUnits("50", 18))).to.be.reverted;
         });
+
+        it("Should allow owner to withdraw stuck tokens", async function(){
+            const withdrawAmount = ethers.parseUnits("100", 18);
+            const balanceBefore = await stakingToken.balanceOf(owner.address);
+            await staking.withdrawStuckTokens(withdrawAmount);
+            const balanceAfter = await stakingToken.balanceOf(owner.address);
+            expect(balanceAfter).to.equal(balanceBefore + withdrawAmount);
+        });
+
+        it("Should revert if non-owner tries to withdraw stuck tokens", async function(){
+            await expect(staking.connect(staker1).withdrawStuckTokens(ethers.parseUnits("100", 18))).to.be.reverted;
+        });
     });
 
     describe("Upgradeability (UUPS)", function(){
